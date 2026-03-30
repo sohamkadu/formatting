@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard</title>
+
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('newswizard-theme') === 'dark') {
+          document.documentElement.classList.add('dark-mode');
+        }
+      } catch (_) {}
+    })();
+  </script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h5>MailScheduler</h5>
+        <span>Automated Newsletter System</span>
+      </div>
+
+      <nav>
+        <a href="/dashboard" class="active">Dashboard</a>
+        <a href="/recipients">Recipients</a>
+        <a href="/schedules">Schedules</a>
+      </nav>
+
+      <div class="user-box">
+        <p>Signed in as</p>
+        <strong>{{ session_email }}</strong>
+        <a href="/logout" class="btn btn-sm btn-outline-light mt-2">Logout</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="top-theme-toggle">
+        <button id="themeSwitch" type="button" class="theme-switch" aria-pressed="false" aria-label="Toggle dark mode">
+          <span class="theme-switch-track-icon theme-switch-sun" aria-hidden="true">☀</span>
+          <span class="theme-switch-track-icon theme-switch-moon" aria-hidden="true">☾</span>
+          <span class="theme-switch-knob" aria-hidden="true">
+            <span class="theme-switch-knob-icon">☀</span>
+          </span>
+        </button>
+      </div>
+
+      <h1>Dashboard</h1>
+
+      <div class="card-grid">
+        <div class="stat-card">
+          <h6>SMTP</h6>
+          <strong>Ready</strong>
+        </div>
+
+        <div class="stat-card">
+          <h6>Recipients</h6>
+          <strong>{{ recipients_count }}</strong>
+        </div>
+
+        <div class="stat-card">
+          <h6>Schedules</h6>
+          <strong>{{ schedules_count }}</strong>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <a href="/recipients" class="btn btn-primary">Manage Recipients</a>
+      <a href="/reset" class="btn btn-danger ms-2" onclick="return confirm('Delete ALL data?')">Reset All Data</a>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const storageKey = 'newswizard-theme';
+      const switchButton = document.getElementById('themeSwitch');
+      const knobIcon = switchButton ? switchButton.querySelector('.theme-switch-knob-icon') : null;
+      if (!switchButton) return;
+
+      const apply = (mode) => {
+        const dark = mode === 'dark';
+        document.documentElement.classList.toggle('dark-mode', dark);
+        switchButton.classList.toggle('is-dark', dark);
+        switchButton.setAttribute('aria-pressed', dark ? 'true' : 'false');
+        if (knobIcon) {
+          knobIcon.textContent = dark ? '☾' : '☀';
+        }
+      };
+
+      const saved = localStorage.getItem(storageKey);
+      apply(saved === 'dark' ? 'dark' : 'light');
+
+      switchButton.addEventListener('click', function () {
+        const next = document.documentElement.classList.contains('dark-mode') ? 'light' : 'dark';
+        apply(next);
+        localStorage.setItem(storageKey, next);
+      });
+    })();
+  </script>
+</body>
+</html>

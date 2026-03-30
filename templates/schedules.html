@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Schedules</title>
+
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('newswizard-theme') === 'dark') {
+                    document.documentElement.classList.add('dark-mode');
+                }
+            } catch (_) {}
+        })();
+    </script>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="brand">
+                <h5>MailScheduler</h5>
+                <span>Automated Newsletter System</span>
+            </div>
+
+            <nav>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/recipients">Recipients</a>
+                <a href="/schedules" class="active">Schedules</a>
+            </nav>
+
+            <div class="user-box">
+                <p>Signed in as</p>
+                <strong>{{ session_email }}</strong>
+                <a href="/logout" class="btn btn-sm btn-outline-light mt-2">Logout</a>
+            </div>
+        </aside>
+
+        <main class="content">
+            <h1>Schedules</h1>
+            <p class="text-muted">Upcoming scheduled emails</p>
+
+            {% if schedules %}
+                <form id="bulkDeleteForm" method="post" action="/schedules/delete-selected" class="d-flex justify-content-end mt-3 mb-2">
+                    <div id="bulkDeleteInputs"></div>
+                    <button
+                        id="deleteSelectedButton"
+                        type="button"
+                        class="btn btn-sm btn-outline-danger"
+                        disabled
+                    >
+                        Delete Selected
+                    </button>
+                </form>
+
+                <div class="card mt-4 schedule-card">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 schedule-table">
+                            <thead>
+                                <tr>
+                                    <th class="text-center ps-3">
+                                        <input id="selectAllSchedules" class="form-check-input" type="checkbox" aria-label="Select all schedules">
+                                    </th>
+                                    <th class="ps-4">Subject</th>
+                                    <th>Recipients</th>
+                                    <th class="text-nowrap">Send Time</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in schedules %}
+                                    <tr data-schedule-id="{{ s.id }}">
+                                        <td class="text-center ps-3">
+                                            <input
+                                                class="form-check-input js-schedule-select"
+                                                type="checkbox"
+                                                value="{{ s.id }}"
+                                                aria-label="Select schedule {{ s.id }}"
+                                            >
+                                        </td>
+                                        <td class="ps-4 subject-cell" title="{{ s.subject }}">{{ s.subject }}</td>
+                                        <td class="recipients-cell" title="{{ s.recipients }}">{{ s.recipients }}</td>
+                                        <td class="text-nowrap send-time-cell" title="{{ s.send_time.strftime('%d %b %Y, %I:%M %p') }}">{{ s.send_time.strftime("%d %b %Y, %I:%M %p") }}</td>
+                                        <td class="status-cell text-center">
+                                            {% if s.status == 'sent' %}
+                                                <span class="badge bg-success">Sent</span>
+                                            {% elif s.status == 'failed' %}
+                                                <span class="badge bg-danger">Failed</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end pe-4 actions-cell">
+                                            <div class="d-inline-flex align-items-center gap-2 schedule-actions">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-light border js-toggle-edit js-edit-btn"
+                                                    data-id="{{ s.id }}"
+                                                    {% if s.status != 'pending' %}disabled{% endif %}
+                                                    title="Only pending schedules can be edited"
+                                                >
+                                                    Edit
+                                                </button>
+
+                                                <form method="post" action="/schedules/{{ s.id }}/delete" class="m-0">
+                                                    <button
+                                                        type="submit"
+                                                        class="btn btn-sm btn-light border text-danger"
+                                                        onclick="return confirm('Delete this schedule?')"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <tr id="edit-row-{{ s.id }}" style="display:none;" data-edit-row-for="{{ s.id }}">
+                                        <td colspan="6">
+                                            <div class="px-4 py-3 bg-light">
+                                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                                        <strong>Edit scheduled email</strong>
+                                                        <button type="button" class="btn btn-sm btn-light border js-toggle-edit" data-id="{{ s.id }}">Close</button>
+                                                    </div>
+
+                                                    <form method="post" action="/schedules/{{ s.id }}/update" class="mt-3">
+                                                        <div class="row g-2 align-items-end">
+                                                            <div class="col-12 col-md-6">
+                                                                <label class="form-label">New send time</label>
+                                                                <input
+                                                                    class="form-control"
+                                                                    type="datetime-local"
+                                                                    name="send_time"
+                                                                    value="{{ s.send_time.strftime('%Y-%m-%dT%H:%M') }}"
+                                                                    required
+                                                                >
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <label class="form-label">Email message</label>
+                                                                <textarea
+                                                                    class="form-control"
+                                                                    name="message"
+                                                                    rows="6"
+                                                                    required
+                                                                >{{ s.message
+                                                                    |replace('<br />', '\n')
+                                                                    |replace('<br/>', '\n')
+                                                                    |replace('<br>', '\n')
+                                                                    |replace('</p>', '\n')
+                                                                    |replace('<p>', '')
+                                                                    |striptags
+                                                                    |trim }}</textarea>
+                                                            </div>
+                                                            <div class="col-12 col-md-auto">
+                                                                <button class="btn btn-primary" type="submit">Save</button>
+                                                                <button class="btn btn-light border ms-2 js-toggle-edit" type="button" data-id="{{ s.id }}">Cancel</button>
+                                                            </div>
+                                                        </div>
+                                                        <p class="text-muted small mt-2 mb-0">Only pending schedules can be edited.</p>
+                                                    </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-info mt-4">No scheduled emails.</div>
+            {% endif %}
+
+            <script>
+                function toggleEditRow(id) {
+                    const editRow = document.getElementById(`edit-row-${id}`);
+                    if (!editRow) return;
+                    const isOpen = editRow.style.display !== 'none';
+                    editRow.style.display = isOpen ? 'none' : '';
+                }
+
+                document.addEventListener('click', function (e) {
+                    const btn = e.target && e.target.closest ? e.target.closest('.js-toggle-edit') : null;
+                    if (!btn) return;
+                    if (btn.classList && btn.classList.contains('js-edit-btn') && btn.disabled) return;
+                    const id = btn.getAttribute('data-id');
+                    if (!id) return;
+                    toggleEditRow(id);
+                });
+
+                (function () {
+                    const selectAll = document.getElementById('selectAllSchedules');
+                    const bulkDeleteButton = document.getElementById('deleteSelectedButton');
+                    const bulkDeleteForm = document.getElementById('bulkDeleteForm');
+                    const bulkDeleteInputs = document.getElementById('bulkDeleteInputs');
+                    if (!bulkDeleteButton || !bulkDeleteForm || !bulkDeleteInputs) return;
+
+                    const getRowChecks = () => Array.from(document.querySelectorAll('.js-schedule-select'));
+
+                    const selectedIds = () =>
+                        getRowChecks()
+                            .filter((cb) => cb.checked)
+                            .map((cb) => cb.value);
+
+                    const renderHiddenInputs = (ids) => {
+                        bulkDeleteInputs.innerHTML = ids
+                            .map((id) => `<input type="hidden" name="schedule_ids" value="${id}">`)
+                            .join('');
+                    };
+
+                    const refreshSelectionUi = () => {
+                        const checks = getRowChecks();
+                        const ids = selectedIds();
+                        bulkDeleteButton.disabled = ids.length === 0;
+                        renderHiddenInputs(ids);
+
+                        if (selectAll) {
+                            const allChecked = checks.length > 0 && checks.every((cb) => cb.checked);
+                            selectAll.checked = allChecked;
+                        }
+                    };
+
+                    if (selectAll) {
+                        selectAll.addEventListener('change', function () {
+                            getRowChecks().forEach((cb) => {
+                                cb.checked = this.checked;
+                            });
+                            refreshSelectionUi();
+                        });
+                    }
+
+                    document.addEventListener('change', function (event) {
+                        const target = event.target;
+                        if (target && target.classList && target.classList.contains('js-schedule-select')) {
+                            refreshSelectionUi();
+                        }
+                    });
+
+                    bulkDeleteButton.addEventListener('click', function () {
+                        const count = selectedIds().length;
+                        if (!count) return;
+                        if (!confirm(`Delete ${count} selected schedule(s)?`)) return;
+                        bulkDeleteForm.submit();
+                    });
+
+                    refreshSelectionUi();
+                })();
+
+                function applyScheduleStatusUpdate(data) {
+                    if (!data || !data.schedules) return;
+
+                    data.schedules.forEach(schedule => {
+                        const row = document.querySelector(`tr[data-schedule-id="${schedule.id}"]`);
+                        if (!row) return;
+
+                        const statusCell = row.querySelector('.status-cell');
+                        if (!statusCell) return;
+
+                        // Disable edit button once not pending
+                        const editBtn = row.querySelector('.actions-cell .js-edit-btn');
+                        const editRow = document.getElementById(`edit-row-${schedule.id}`);
+                        if (editBtn) {
+                            editBtn.disabled = schedule.status !== 'pending';
+                        }
+                        if (schedule.status !== 'pending' && editRow) {
+                            editRow.style.display = 'none';
+                        }
+
+                        if (schedule.status === 'sent') {
+                            statusCell.innerHTML = '<span class="badge bg-success">Sent</span>';
+                        } else if (schedule.status === 'failed') {
+                            statusCell.innerHTML = '<span class="badge bg-danger">Failed</span>';
+                        } else {
+                            statusCell.innerHTML = '<span class="badge bg-warning">Pending</span>';
+                        }
+                    });
+                }
+
+                // Simple status update approach: polling every second.
+                function startPolling() {
+                    function updateOnce() {
+                        fetch('/api/schedules/status', { cache: 'no-store' })
+                            .then(r => r.json())
+                            .then(applyScheduleStatusUpdate)
+                            .catch(() => {});
+                    }
+                    updateOnce();
+                    setInterval(updateOnce, 1000);
+                }
+
+                startPolling();
+            </script>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,93 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  height: 100vh;
+  background: linear-gradient(135deg, #0d6efd, #0a58ca);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Segoe UI", sans-serif;
+}
+.login-wrapper {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+}
+.login-card {
+  background: white;
+  padding: 40px 30px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+.project-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.project-tagline {
+  color: #6c757d;
+  margin-bottom: 30px;
+}
+.form-control {
+  height: 48px;
+  border-radius: 10px;
+}
+.btn-dark {
+  height: 48px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.signup-link {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.signup-link a {
+  text-decoration: none;
+  font-weight: 600;
+  color: #0d6efd;
+}
+
+html.dark-mode body {
+  background: linear-gradient(140deg, #020617, #0f172a);
+}
+
+html.dark-mode .login-card {
+  background: #0f172a;
+  color: #e2e8f0;
+  box-shadow: 0 22px 44px rgba(2, 6, 23, 0.55);
+}
+
+html.dark-mode .project-tagline,
+html.dark-mode .signup-link span {
+  color: #94a3b8;
+}
+
+html.dark-mode .form-control {
+  background: #111827;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+html.dark-mode .form-control::placeholder {
+  color: #8aa0ba;
+}
+
+html.dark-mode .btn-dark {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+html.dark-mode .btn-dark:hover {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+
+html.dark-mode .signup-link a {
+  color: #93c5fd;
+}

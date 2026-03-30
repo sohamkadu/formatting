@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recipients</title>
+
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('newswizard-theme') === 'dark') {
+          document.documentElement.classList.add('dark-mode');
+        }
+      } catch (_) {}
+    })();
+  </script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h5>MailScheduler</h5>
+        <span>Automated Newsletter System</span>
+      </div>
+
+      <nav>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/recipients" class="active">Recipients</a>
+        <a href="/schedules">Schedules</a>
+      </nav>
+
+      <div class="user-box">
+        <p>Signed in as</p>
+        <strong>{{ session_email }}</strong>
+        <a href="/logout" class="btn btn-sm btn-outline-light mt-2">Logout</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <h1>Recipients</h1>
+      <p class="text-muted">Add recipients, upload CSVs, and send bulk emails.</p>
+
+      <hr>
+
+      <!-- 1) Add one recipient (single email) -->
+      <div class="card p-3 mb-4">
+        <h5>Add one recipient</h5>
+        <form method="post" class="d-flex gap-2">
+          <input type="email" name="email" class="form-control" placeholder="someone@gmail.com" required>
+          <button class="btn btn-primary" type="submit">Add</button>
+        </form>
+      </div>
+
+      <!-- 2) Select saved recipients + schedule email -->
+      <form method="post" action="/send" enctype="multipart/form-data" class="card p-4 mb-4 compose-card">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <h5 class="mb-0">Saved Recipients</h5>
+          <button
+            id="toggleSelectAllRecipients"
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            aria-label="Select or unselect all recipients"
+          >
+            Select all
+          </button>
+        </div>
+
+        {% if recipients %}
+          
+          <div id="recipientList" class="recipient-list">
+            {% for chunk in recipients|batch(10, none) %}
+              <div class="recipient-column">
+                {% for r in chunk if r %}
+                  <div class="form-check recipient-item" data-email="{{ r.email|lower }}">
+                    <input class="form-check-input js-recipient-check" type="checkbox" name="recipients" value="{{ r.email }}" id="r-{{ r.id }}">
+                    <label class="form-check-label recipient-label" for="r-{{ r.id }}">{{ r.email }}</label>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">No recipients yet. Add one above or upload a CSV.</p>
+        {% endif %}
+
+        <hr class="my-4">
+
+        <section class="compose-section">
+          <div class="compose-section-head">
+            <h6 class="compose-title mb-1">Template Library</h6>
+            <p class="compose-subtitle mb-0">Choose a ready template to auto-fill subject and message.</p>
+          </div>
+
+          <div class="template-picker" id="templatePicker">
+            <button
+              type="button"
+              id="templatePickerButton"
+              class="template-picker-btn"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="templatePickerMenu"
+            >
+              <span id="templatePickerLabel">Choose template (auto-fill subject and message)</span>
+              <span class="template-picker-caret" aria-hidden="true">▾</span>
+            </button>
+
+            <div id="templatePickerMenu" class="template-picker-menu" role="listbox" aria-label="Email template library">
+              <div class="template-group">
+                <div class="template-group-title">Business templates</div>
+                <button type="button" class="template-option" data-template-key="business_followup">Business Follow-up</button>
+                <button type="button" class="template-option" data-template-key="business_meeting">Business Meeting Request</button>
+              </div>
+
+              <div class="template-group">
+                <div class="template-group-title">College project templates</div>
+                <button type="button" class="template-option" data-template-key="college_progress">Project Progress Update</button>
+                <button type="button" class="template-option" data-template-key="college_submission">Project Submission Notice</button>
+              </div>
+
+              <div class="template-group">
+                <div class="template-group-title">Job application templates</div>
+                <button type="button" class="template-option" data-template-key="job_application">Job Application Email</button>
+                <button type="button" class="template-option" data-template-key="job_followup">Job Application Follow-up</button>
+              </div>
+
+              <div class="template-group">
+                <div class="template-group-title">Festival greeting templates</div>
+                <button type="button" class="template-option" data-template-key="festival_diwali">Diwali Greeting</button>
+                <button type="button" class="template-option" data-template-key="festival_newyear">New Year Greeting</button>
+              </div>
+            </div>
+
+            <input type="hidden" id="templateSelector" value="">
+          </div>
+        </section>
+
+        <section class="compose-section">
+          <label class="form-label mb-1" for="subjectInput">Subject</label>
+          <input id="subjectInput" class="form-control subject-input mb-0" type="text" name="subject" placeholder="Email subject" required>
+        </section>
+
+        <section class="compose-section mb-2">
+          <div class="editor-shell" id="messageEditorShell">
+          <div
+            id="messageEditor"
+            class="rich-editor"
+            contenteditable="true"
+            data-placeholder="Email message"
+            aria-label="Email message"
+          ></div>
+
+          <div class="editor-toolbar" aria-label="Text formatting toolbar">
+            <div class="toolbar-group" aria-label="History">
+              <button type="button" class="toolbar-btn" data-command="undo" title="Undo">↶</button>
+              <button type="button" class="toolbar-btn" data-command="redo" title="Redo">↷</button>
+            </div>
+
+            <span class="toolbar-divider" aria-hidden="true"></span>
+
+            <div class="toolbar-group toolbar-group-select" aria-label="Typography">
+              <select class="toolbar-select" data-command="fontName" title="Font family" aria-label="Font family">
+                <option value="Arial, Helvetica, sans-serif">Sans Serif</option>
+                <option value="Times New Roman, Times, serif">Serif</option>
+                <option value="Courier New, Courier, monospace">Fixed Width</option>
+                <option value="Impact, Haettenschweiler, Arial Black, sans-serif">Wide</option>
+                <option value="Arial Narrow, Arial, sans-serif">Narrow</option>
+                <option value="Comic Sans MS, Comic Sans, cursive">Comic Sans MS</option>
+                <option value="Garamond, Baskerville, serif">Garamond</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Tahoma, sans-serif">Tahoma</option>
+                <option value="Trebuchet MS, sans-serif">Trebuchet MS</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+              </select>
+
+              <select class="toolbar-select" data-command="formatBlock" title="Text style" aria-label="Text style">
+                <option value="P">Normal</option>
+                <option value="H1">Heading 1</option>
+                <option value="H2">Heading 2</option>
+                <option value="H3">Heading 3</option>
+              </select>
+            </div>
+
+            <span class="toolbar-divider" aria-hidden="true"></span>
+
+            <div class="toolbar-group" aria-label="Text emphasis">
+              <button type="button" class="toolbar-btn" data-command="bold" title="Bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-command="italic" title="Italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-command="underline" title="Underline"><u>U</u></button>
+              <input type="color" class="toolbar-color" data-command="foreColor" title="Text color" aria-label="Text color" value="#111827">
+            </div>
+
+            <span class="toolbar-divider" aria-hidden="true"></span>
+
+            <div class="toolbar-group" aria-label="Lists and alignment">
+              <button type="button" class="toolbar-btn" data-command="insertUnorderedList" title="Bulleted list">• List</button>
+              <button type="button" class="toolbar-btn" data-command="insertOrderedList" title="Numbered list">1. List</button>
+              <button type="button" class="toolbar-btn align-btn" data-command="justifyLeft" title="Align left" aria-label="Align left">
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M3 5H17" />
+                  <path d="M3 9H13" />
+                  <path d="M3 13H16" />
+                  <path d="M3 17H11" />
+                </svg>
+              </button>
+              <button type="button" class="toolbar-btn align-btn" data-command="justifyCenter" title="Align center" aria-label="Align center">
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M3 5H17" />
+                  <path d="M5 9H15" />
+                  <path d="M4 13H16" />
+                  <path d="M6 17H14" />
+                </svg>
+              </button>
+              <button type="button" class="toolbar-btn align-btn" data-command="justifyRight" title="Align right" aria-label="Align right">
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M3 5H17" />
+                  <path d="M7 9H17" />
+                  <path d="M4 13H17" />
+                  <path d="M9 17H17" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <textarea class="visually-hidden" id="messageHtml" name="message" rows="4" placeholder="Email message"></textarea>
+
+        <section class="compose-section compose-meta">
+          <div class="compose-meta-field">
+            <label class="form-label mb-1">Send Time</label>
+            <input class="form-control" type="datetime-local" name="send_time">
+          </div>
+          <div class="compose-meta-field">
+            <label class="form-label mb-1">Attachment (optional)</label>
+            <input class="form-control" type="file" name="attachment">
+          </div>
+        </section>
+
+        <div class="compose-actions">
+          <button class="btn btn-success" type="submit">Send Bulk Email</button>
+        </div>
+      </form>
+
+      <script>
+        (function () {
+          const button = document.getElementById('toggleSelectAllRecipients');
+          if (!button) return;
+
+          const getBoxes = () =>
+            Array.from(document.querySelectorAll('input[type="checkbox"][name="recipients"]'));
+
+          const updateButtonLabel = () => {
+            const boxes = getBoxes();
+            if (boxes.length === 0) {
+              button.textContent = 'Select all';
+              button.disabled = true;
+              return;
+            }
+            const allChecked = boxes.every((b) => b.checked);
+            button.textContent = allChecked ? 'Unselect all' : 'Select all';
+          };
+
+          button.addEventListener('click', function () {
+            const boxes = getBoxes();
+            const allChecked = boxes.length > 0 && boxes.every((b) => b.checked);
+            boxes.forEach((b) => {
+              b.checked = !allChecked;
+            });
+            updateButtonLabel();
+          });
+
+          document.addEventListener('change', function (e) {
+            const target = e.target;
+            if (target && target.matches && target.matches('input[type="checkbox"][name="recipients"]')) {
+              updateButtonLabel();
+            }
+          });
+
+          updateButtonLabel();
+        })();
+
+        (function () {
+          const editor = document.getElementById('messageEditor');
+          const hiddenField = document.getElementById('messageHtml');
+          const subjectInput = document.getElementById('subjectInput');
+          const templateSelector = document.getElementById('templateSelector');
+          const templatePicker = document.getElementById('templatePicker');
+          const templatePickerButton = document.getElementById('templatePickerButton');
+          const templatePickerMenu = document.getElementById('templatePickerMenu');
+          const templatePickerLabel = document.getElementById('templatePickerLabel');
+          const form = document.querySelector('form[action="/send"]');
+          const shell = document.getElementById('messageEditorShell');
+          const toggleCommands = [
+            'bold',
+            'italic',
+            'underline',
+            'insertUnorderedList',
+            'insertOrderedList',
+            'justifyLeft',
+            'justifyCenter',
+            'justifyRight'
+          ];
+
+          const templateLibrary = {
+            business_followup: {
+              subject: 'Following up on our previous discussion',
+              message: '<p>Dear Team,</p><p>I hope you are doing well.</p><p>This is a quick follow-up regarding our previous discussion. Please share your updates when convenient so we can finalize the next steps.</p><p>Best regards,<br>Your Name</p>'
+            },
+            business_meeting: {
+              subject: 'Request for a short meeting this week',
+              message: '<p>Dear Team,</p><p>I would like to schedule a short meeting to discuss current priorities and timelines.</p><p>Please let me know your availability for a 20-minute call this week.</p><p>Regards,<br>Your Name</p>'
+            },
+            college_progress: {
+              subject: 'College Project Progress Update',
+              message: '<p>Hello Professor,</p><p>I am writing to share the latest progress on our college project.</p><ul><li>Completed current module implementation</li><li>Tested core user flows</li><li>Prepared next sprint tasks</li></ul><p>Please let us know if any improvements are required.</p><p>Thank you,<br>Your Name</p>'
+            },
+            college_submission: {
+              subject: 'Project Submission - Final Deliverables',
+              message: '<p>Hello Professor,</p><p>We have completed and submitted the final project deliverables.</p><p>The submission includes source code, report, and presentation documents.</p><p>Thank you for your guidance throughout the semester.</p><p>Sincerely,<br>Your Name</p>'
+            },
+            job_application: {
+              subject: 'Application for the [Role] position',
+              message: '<p>Dear Hiring Manager,</p><p>I am writing to apply for the <strong>[Role]</strong> position at <strong>[Company]</strong>.</p><p>I have attached my resume for your review. I would be grateful for the opportunity to discuss my profile further.</p><p>Thank you for your consideration.</p><p>Best regards,<br>Your Name<br>[Phone Number]</p>'
+            },
+            job_followup: {
+              subject: 'Follow-up on my job application',
+              message: '<p>Dear Hiring Team,</p><p>I hope you are doing well. I am following up regarding my application for the <strong>[Role]</strong> position.</p><p>I remain very interested in the opportunity and would appreciate any update on the hiring process.</p><p>Thank you for your time.</p><p>Best regards,<br>Your Name</p>'
+            },
+            festival_diwali: {
+              subject: 'Happy Diwali Wishes',
+              message: '<p>Dear All,</p><p>Wishing you and your family a very <strong>Happy Diwali</strong>.</p><p>May this festival of lights bring happiness, health, and prosperity to your life.</p><p>Warm wishes,<br>Your Name</p>'
+            },
+            festival_newyear: {
+              subject: 'Happy New Year',
+              message: '<p>Dear All,</p><p>Wishing you a joyful and successful <strong>New Year</strong>.</p><p>May the coming year bring new opportunities and memorable moments.</p><p>Best wishes,<br>Your Name</p>'
+            }
+          };
+
+          if (!editor || !hiddenField || !form || !shell || !subjectInput || !templateSelector) return;
+
+          const normalizeEditorHtml = () => {
+            const html = editor.innerHTML
+              .replace(/<div><br><\/div>/gi, '')
+              .replace(/<p><br><\/p>/gi, '')
+              .trim();
+            return html;
+          };
+
+          const syncHiddenField = () => {
+            hiddenField.value = normalizeEditorHtml();
+          };
+
+          const isSelectionInsideEditor = () => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return false;
+            const anchorNode = selection.anchorNode;
+            return !!anchorNode && (anchorNode === editor || editor.contains(anchorNode));
+          };
+
+          const updateToolbarState = () => {
+            const isInsideEditor = isSelectionInsideEditor() || document.activeElement === editor;
+            toggleCommands.forEach((command) => {
+              const button = shell.querySelector(`button[data-command="${command}"]`);
+              if (!button) return;
+
+              if (!isInsideEditor) {
+                button.classList.remove('active');
+                return;
+              }
+
+              let isActive = false;
+              try {
+                isActive = !!document.queryCommandState(command);
+              } catch (error) {
+                isActive = false;
+              }
+              button.classList.toggle('active', isActive);
+            });
+          };
+
+          shell.querySelectorAll('button[data-command]').forEach((control) => {
+            control.addEventListener('click', function () {
+              const command = this.dataset.command;
+              if (!command) return;
+
+              editor.focus();
+              document.execCommand(command, false, null);
+              syncHiddenField();
+              updateToolbarState();
+            });
+          });
+
+          shell.querySelectorAll('select[data-command], input[data-command]').forEach((control) => {
+            control.addEventListener('change', function () {
+              const command = this.dataset.command;
+              if (!command) return;
+
+              editor.focus();
+              document.execCommand(command, false, this.value);
+              syncHiddenField();
+              updateToolbarState();
+            });
+          });
+
+          const applySelectedTemplate = (key) => {
+            if (!key || !templateLibrary[key]) return;
+
+            subjectInput.value = templateLibrary[key].subject;
+            editor.innerHTML = templateLibrary[key].message;
+            syncHiddenField();
+            editor.focus();
+            updateToolbarState();
+          };
+
+          if (templatePicker && templatePickerButton && templatePickerMenu && templatePickerLabel) {
+            const openTemplateMenu = () => {
+              templatePicker.classList.add('open');
+              templatePickerButton.setAttribute('aria-expanded', 'true');
+            };
+
+            const closeTemplateMenu = () => {
+              templatePicker.classList.remove('open');
+              templatePickerButton.setAttribute('aria-expanded', 'false');
+            };
+
+            templatePickerButton.addEventListener('click', function () {
+              if (templatePicker.classList.contains('open')) {
+                closeTemplateMenu();
+              } else {
+                openTemplateMenu();
+              }
+            });
+
+            templatePickerMenu.querySelectorAll('.template-option').forEach((option) => {
+              option.addEventListener('click', function () {
+                const key = this.getAttribute('data-template-key') || '';
+                templateSelector.value = key;
+                templatePickerLabel.textContent = this.textContent || 'Choose template';
+
+                templatePickerMenu.querySelectorAll('.template-option').forEach((btn) => {
+                  btn.classList.toggle('selected', btn === this);
+                });
+
+                closeTemplateMenu();
+                applySelectedTemplate(key);
+              });
+            });
+
+            document.addEventListener('click', function (event) {
+              if (!templatePicker.contains(event.target)) {
+                closeTemplateMenu();
+              }
+            });
+
+            document.addEventListener('keydown', function (event) {
+              if (event.key === 'Escape') {
+                closeTemplateMenu();
+              }
+            });
+          }
+
+          editor.addEventListener('input', syncHiddenField);
+          editor.addEventListener('keyup', updateToolbarState);
+          editor.addEventListener('mouseup', updateToolbarState);
+          editor.addEventListener('focus', updateToolbarState);
+          document.addEventListener('selectionchange', updateToolbarState);
+
+          form.addEventListener('submit', function (event) {
+            syncHiddenField();
+            const textOnly = editor.innerText.replace(/\s+/g, ' ').trim();
+            if (!textOnly) {
+              event.preventDefault();
+              editor.focus();
+              alert('Please enter an email message.');
+            }
+          });
+
+          updateToolbarState();
+        })();
+      </script>
+
+      <!-- 3) CSV upload -->
+      <div class="card p-3">
+        <h5>Upload recipients CSV</h5>
+        <p class="text-muted mb-2">
+          CSV format: one email per row in the first column, OR a header named <strong>email</strong>.
+        </p>
+
+        <form method="post" action="/upload" enctype="multipart/form-data" class="d-flex gap-2">
+          <input class="form-control" type="file" name="file" accept=".csv" required>
+          <button class="btn btn-secondary" type="submit">Upload</button>
+        </form>
+
+        <hr>
+        <form method="post" action="/recipients/clear">
+          <button class="btn btn-outline-danger" type="submit">Clear all recipients</button>
+        </form>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
